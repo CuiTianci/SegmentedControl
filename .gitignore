@@ -1,0 +1,13 @@
+local.properties
+*.DS_Store
+.gradle
+build
+**/build
+*.iml
+*.ipr
+*.iws
+.idea
+.classpath
+.project
+.cproject
+.settings
