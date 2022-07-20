@@ -48,6 +48,79 @@ public class SegmentedControl extends View {
         super(context, attrs, defStyleAttr);
     }
 
+    /**
+     * 设置 titles。
+     */
+    public void setTitles(@NonNull String[] titles) {
+        this.setTitles(titles, 0);
+    }
+
+    /**
+     * 设置 titles。
+     *
+     * @param initIndex 初始选中索引。
+     */
+    public void setTitles(@NonNull String[] titles, int initIndex) {
+        if (titles.length < 2) {
+            throw new IllegalArgumentException("At least 2 titles should be provided.");
+        }
+        if (initIndex < 0 || initIndex >= titles.length) {
+            throw new IllegalArgumentException(String.format("The initIndex must be included in [%d, %d]", 0, titles.length - 1));
+        }
+        for (String title : titles) {
+            if (TextUtils.isEmpty(title)) {
+                throw new IllegalArgumentException("Any of the titles must not be empty.");
+            }
+        }
+        currentIndex = initIndex;
+        this.titles = titles;
+        invalidate();
+    }
+
+    /**
+     * 设置选中变化监听器。
+     */
+    public void setSelectionChangeListener(SelectionChangeListener selectionChangeListener) {
+        this.selectionChangeListener = selectionChangeListener;
+    }
+
+    /**
+     * 获取当前选中索引。
+     */
+    public int getSelectedIndex() {
+        return currentIndex;
+    }
+
+    /**
+     * 设置当前选中目标。
+     *
+     * @param targetIndex 目标索引。
+     * @see #setSelectedIndex(int, boolean)
+     */
+    public void setSelectedIndex(int targetIndex) {
+        this.setSelectedIndex(targetIndex, true);
+    }
+
+    /**
+     * 设置当前选中目标。
+     *
+     * @param targetIndex   目标索引。
+     * @param withAnimation 改变选中时是否播放动画。
+     */
+    public void setSelectedIndex(int targetIndex, boolean withAnimation) {
+        if (targetIndex < 0 || targetIndex >= titles.length) {
+            throw new IllegalArgumentException(String.format("The targetIndex must be included in [%d, %d]", 0, titles.length - 1));
+        }
+        if (withAnimation) {
+            animateToIndex(targetIndex);
+        } else {
+            changeIndex(targetIndex);
+            float controlWidth = ((float) getWidth() / titles.length);
+            currentControlStart = currentIndex * controlWidth;
+            invalidate();
+        }
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -67,77 +140,58 @@ public class SegmentedControl extends View {
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (titles == null || titles.length < 2) return true;
-        if (event.getPointerCount() > 1) return true;
+        if (titles == null || titles.length < 2) return false;
+        if (event.getPointerCount() > 1) return false;
         if (event.getActionMasked() == MotionEvent.ACTION_UP) {
             MotionEvent.PointerCoords pointerCoords = new MotionEvent.PointerCoords();
             event.getPointerCoords(0, pointerCoords);
             // 忽略垂直方向上超出 View 的点击，不考虑 padding 因素。
-            if (pointerCoords.y > getHeight() || pointerCoords.y < 0) return true;
+            if (pointerCoords.y > getHeight() || pointerCoords.y < 0) return false;
             // 计算 touch 区域，所属 index 范围。
             int touchAreaIndex = (int) (pointerCoords.x / (getWidth() / titles.length));
-            // 避免极端计算情况（因为存在多处 float 与 int 的转换），超出 index 范围。重复点击同一区域无效。
-            if (touchAreaIndex >= 0 && touchAreaIndex <= titles.length - 1 && currentIndex != touchAreaIndex) {
-                currentIndex = touchAreaIndex; // 记录当前选中。
-                // 选中变化回调。
-                if (selectionChangeListener != null)
-                    selectionChangeListener.onSelectionChanged(currentIndex);
-                // 动画部分。
-                if (controlStartXAnimator != null) controlStartXAnimator.cancel();
-                float controlWidth = ((float) getWidth() / titles.length);
-                controlStartXAnimator = ValueAnimator.ofFloat(currentControlStart, currentIndex * controlWidth);
-                controlStartXAnimator.setDuration(ANIMATION_DURATION);
-                controlStartXAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
-                controlStartXAnimator.addUpdateListener(animation -> {
-                    currentControlStart = (float) (animation.getAnimatedValue());
-                    invalidate();
-                });
-                controlStartXAnimator.start();
+            // 避免极端计算情况（因为存在多处 float 与 int 的转换），超出 index 范围。
+            if (touchAreaIndex >= 0 && touchAreaIndex <= titles.length - 1) {
+                animateToIndex(touchAreaIndex);
             }
         }
         return true;
+    }
+
+    /**
+     * 选中目标索引指向的 title。
+     *
+     * @param targetIndex 目标索引。
+     */
+    private void animateToIndex(int targetIndex) {
+        if (targetIndex == currentIndex) return;
+        changeIndex(targetIndex);
+        float controlWidth = ((float) getWidth() / titles.length);
+        controlStartXAnimator = ValueAnimator.ofFloat(currentControlStart, currentIndex * controlWidth);
+        controlStartXAnimator.setDuration(ANIMATION_DURATION);
+        controlStartXAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+        controlStartXAnimator.addUpdateListener(animation -> {
+            currentControlStart = (float) (animation.getAnimatedValue());
+            invalidate();
+        });
+        controlStartXAnimator.start();
+    }
+
+    /**
+     * 改变当前选中。
+     */
+    private void changeIndex(int targetIndex) {
+        if (currentIndex == targetIndex) return;
+        currentIndex = targetIndex; // 记录当前选中索引。
+        // 选中变化回调。
+        if (selectionChangeListener != null)
+            selectionChangeListener.onSelectionChanged(currentIndex);
+        if (controlStartXAnimator != null) controlStartXAnimator.cancel();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         if (controlStartXAnimator != null) controlStartXAnimator.cancel();
-    }
-
-    /**
-     * 设置 titles。
-     */
-    public void setTitles(@NonNull String[] titles) {
-        this.setTitles(titles, 0);
-    }
-
-    /**
-     * 设置 titles。
-     * @param initIndex 初始选中索引。
-     */
-    public void setTitles(@NonNull String[] titles, int initIndex) {
-        if (titles.length < 2) {
-            throw new IllegalArgumentException("At least 2 titles should be provided.");
-        }
-        for (String title : titles) {
-            if (TextUtils.isEmpty(title)) {
-                throw new IllegalArgumentException("Any of the titles must not be empty.");
-            }
-        }
-        currentIndex = initIndex;
-        this.titles = titles;
-        invalidate();
-    }
-
-    public void setSelectionChangeListener(SelectionChangeListener selectionChangeListener) {
-        this.selectionChangeListener = selectionChangeListener;
-    }
-
-    /**
-     * 获取当前选中索引。
-     */
-    public int getSelectedIndex() {
-        return currentIndex;
     }
 
     private void drawTitles(Canvas canvas) {

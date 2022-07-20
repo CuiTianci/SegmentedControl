@@ -13,10 +13,20 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        SegmentedControl segmentedControl = ((SegmentedControl) findViewById(R.id.segc));
         String[] titles = new String[]{"URL", "Video ID", "Channel ID", "Test ID"};
-        ((SegmentedControl) findViewById(R.id.segc)).setTitles(titles, 1);
-        ((SegmentedControl) findViewById(R.id.segc)).setSelectionChangeListener(index -> {
-            ((TextView) findViewById(R.id.tv)).setText(titles[index]);
+        segmentedControl.setTitles(titles, 2);
+        segmentedControl.setSelectionChangeListener(index -> ((TextView) findViewById(R.id.tv)).setText(titles[index]));
+        findViewById(R.id.withAnima).setOnClickListener(view -> {
+            int currentSelected = segmentedControl.getSelectedIndex();
+            int targetIndex = currentSelected == 0 ? titles.length - 1 : 0;
+            segmentedControl.setSelectedIndex(targetIndex);
+        });
+
+        findViewById(R.id.withoutAnima).setOnClickListener(view -> {
+            int currentSelected = segmentedControl.getSelectedIndex();
+            int targetIndex = currentSelected == 0 ? titles.length - 1 : 0;
+            segmentedControl.setSelectedIndex(targetIndex, false);
         });
     }
 }
